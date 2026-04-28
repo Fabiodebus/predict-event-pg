@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: predict
+          POSTGRES_PASSWORD: predict
+          POSTGRES_DB: predict
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install dependencies
+        run: poetry install
+      - name: Run tests
+        run: poetry run pytest --cov=app --cov-report=xml
+        env:
+          DATABASE_URL: postgresql+asyncpg://predict:predict@localhost:5432/predict
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/1
+          AWS_REGION: us-east-1
+          AWS_S3_BUCKET: test-bucket
+          COGNITO_USER_POOL_ID: us-east-1_TEST
+          COGNITO_CLIENT_ID: testclientid
+          COGNITO_REGION: us-east-1
+          ANTHROPIC_API_KEY: sk-ant-test
+          OPENAI_API_KEY: sk-test
+          CRUSTDATA_API_KEY: test
+          BROWSER_USE_API_KEY: test
+          UNIPILE_API_KEY: test
+          UNIPILE_BASE_URL: https://api.unipile.com
+
+  frontend:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run type-check
+      - name: Run tests
+        run: npm test -- --run
