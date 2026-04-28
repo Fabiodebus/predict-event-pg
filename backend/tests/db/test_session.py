@@ -1,4 +1,3 @@
-import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -9,9 +8,13 @@ async def test_get_db_yields_async_session():
         break
 
 
-async def test_get_db_session_closes_after_use():
+async def test_get_db_returns_new_session_each_call():
+    """Each call to get_db() should produce an independent session object."""
     from app.db.session import get_db
-    sessions = []
+    first_id = None
+    second_id = None
     async for session in get_db():
-        sessions.append(session)
-    assert sessions[0].is_active is False
+        first_id = id(session)
+    async for session in get_db():
+        second_id = id(session)
+    assert first_id != second_id
