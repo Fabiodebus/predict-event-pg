@@ -10,7 +10,14 @@ from sqlmodel import SQLModel
 
 import app.models  # noqa: F401 - registers Job and all future models with SQLModel.metadata
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+# Use TEST_DATABASE_URL if set, otherwise fall back to DATABASE_URL.
+# A dedicated test DB is strongly recommended — the session fixture calls drop_all on teardown.
+DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or os.environ["DATABASE_URL"]
+
+assert "localhost" in DATABASE_URL or "_test" in DATABASE_URL or "127.0.0.1" in DATABASE_URL, (
+    f"Refusing to run destructive test fixtures against a non-local / non-test database.\n"
+    f"Set TEST_DATABASE_URL to a dedicated test database URL.\nGot: {DATABASE_URL!r}"
+)
 
 
 @pytest_asyncio.fixture(scope="session")
