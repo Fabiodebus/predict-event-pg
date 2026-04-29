@@ -309,7 +309,7 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
 
 - [ ] **Step 4: Register the middleware in `main.py`**
 
-Edit `backend/app/main.py` — add the import and middleware registration *before* `include_router`:
+Edit `backend/app/main.py`. Note: Starlette runs the LAST-registered middleware as the OUTERMOST layer, so register `CORSMiddleware` first (inner) and `CorrelationIDMiddleware` last (outermost). Otherwise CORS short-circuits OPTIONS preflight before the correlation middleware can stamp the header. Also add `expose_headers` so browser JS can read the header off `fetch` responses.
 
 ```python
 from fastapi import FastAPI
@@ -317,13 +317,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import router as v1_router
 from app.config import settings
-from app.middleware.correlation import CorrelationIDMiddleware
+from app.middleware.correlation import CORRELATION_HEADER, CorrelationIDMiddleware
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="PREDICT Event API", version="0.1.0")
-
-    app.add_middleware(CorrelationIDMiddleware)
 
     app.add_middleware(
         CORSMiddleware,
@@ -331,7 +329,9 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=[CORRELATION_HEADER],
     )
+    app.add_middleware(CorrelationIDMiddleware)
 
     app.include_router(v1_router)
     return app
@@ -522,7 +522,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 - [ ] **Step 4: Wire handlers into main.py**
 
-Edit `backend/app/main.py` — add the import and call `register_exception_handlers(app)` after middleware registration:
+Edit `backend/app/main.py` — add the import and call `register_exception_handlers(app)` after middleware registration. Keep the middleware order: CORS first (inner), CorrelationID last (outermost).
 
 ```python
 from fastapi import FastAPI
@@ -531,13 +531,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import router as v1_router
 from app.config import settings
 from app.errors import register_exception_handlers
-from app.middleware.correlation import CorrelationIDMiddleware
+from app.middleware.correlation import CORRELATION_HEADER, CorrelationIDMiddleware
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="PREDICT Event API", version="0.1.0")
-
-    app.add_middleware(CorrelationIDMiddleware)
 
     app.add_middleware(
         CORSMiddleware,
@@ -545,7 +543,9 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=[CORRELATION_HEADER],
     )
+    app.add_middleware(CorrelationIDMiddleware)
 
     register_exception_handlers(app)
     app.include_router(v1_router)
@@ -1053,15 +1053,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     app = FastAPI(title="PREDICT Event API", version="0.1.0", lifespan=lifespan)
 
-    app.add_middleware(CorrelationIDMiddleware)
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=[CORRELATION_HEADER],
     )
+    app.add_middleware(CorrelationIDMiddleware)
 
     register_exception_handlers(app)
     app.include_router(v1_router)
@@ -1070,6 +1070,8 @@ def create_app() -> FastAPI:
 
 app = create_app()
 ```
+
+> Note: importing `CORRELATION_HEADER` requires also adding `from app.middleware.correlation import CORRELATION_HEADER, CorrelationIDMiddleware` at the top of the file.
 
 - [ ] **Step 5: Run tests**
 
