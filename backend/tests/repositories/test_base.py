@@ -17,9 +17,11 @@ async def test_create_and_get(db):
     assert created.id is not None
     assert created.task_type == "test"
 
-    fetched = await repo.get(created.id)
+    created_id = created.id  # capture before expiring
+    db.expire_all()  # flush identity map so get() hits the DB
+    fetched = await repo.get(created_id)
     assert fetched is not None
-    assert fetched.id == created.id
+    assert fetched.id == created_id
 
 
 async def test_get_returns_none_for_missing_id(db):
@@ -65,7 +67,9 @@ async def test_update(db):
     updated = await repo.update(job)
     assert updated.task_type == "updated"
 
-    fetched = await repo.get(job.id)
+    job_id = job.id  # capture before expiring
+    db.expire_all()  # flush identity map so get() hits the DB
+    fetched = await repo.get(job_id)
     assert fetched.task_type == "updated"
 
 

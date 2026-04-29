@@ -1,15 +1,19 @@
+from datetime import UTC, datetime
 from typing import Any, ClassVar, Generic, TypeVar
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 from sqlmodel import SQLModel
 
 T = TypeVar("T", bound=SQLModel)
 
 
 class BaseRepository(Generic[T]):
-    model: ClassVar[type]
+    # Subclasses must set model = ConcreteModel. Only session-bound (not detached)
+    # objects should be passed to create/update — flush()+refresh() requires the
+    # object to remain associated with this session.
+    model: ClassVar[type[T]]  # type: ignore[misc]
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -32,6 +36,7 @@ class BaseRepository(Generic[T]):
         return obj
 
     async def update(self, obj: T) -> T:
+        obj.updated_at = datetime.now(UTC).replace(tzinfo=None)  # type: ignore[attr-defined]
         self.db.add(obj)
         await self.db.flush()
         await self.db.refresh(obj)
