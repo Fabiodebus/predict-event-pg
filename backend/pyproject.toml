@@ -27,6 +27,7 @@ python-jose = {extras = ["cryptography"], version = ">=3.3"}
 anthropic = ">=0.30"
 openai = ">=1.40"
 greenlet = "^3.5.0"
+pydantic = {extras = ["email"], version = "^2.13.3"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0"

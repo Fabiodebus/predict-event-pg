@@ -1,14 +1,25 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import router as v1_router
 from app.config import settings
+from app.dependencies import get_token_validator
 from app.errors import register_exception_handlers
 from app.middleware.correlation import CORRELATION_HEADER, CorrelationIDMiddleware
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    validator = get_token_validator()
+    await validator.load_jwks()
+    yield
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="PREDICT Event API", version="0.1.0")
+    app = FastAPI(title="PREDICT Event API", version="0.1.0", lifespan=lifespan)
 
     # Starlette runs the LAST-registered middleware as the OUTERMOST layer.
     # CORSMiddleware short-circuits OPTIONS preflight, so it must be inner —
