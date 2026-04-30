@@ -80,7 +80,11 @@ backend/
 
 ## Test Conventions
 
-All HTTP tests use FastAPI's `TestClient` via the synchronous `httpx.Client`. For tests that hit the database, use the existing `db` fixture and override `get_db` like this (defined once in `tests/conftest.py` or the per-module conftest as needed — the fixture pattern is repeated in plan tasks where it's first introduced):
+**Pure HTTP tests** (no DB) use FastAPI's `TestClient`.
+
+**DB-touching HTTP tests** must use `httpx.AsyncClient` with `ASGITransport`. Reason: `TestClient` runs the app via anyio's blocking portal which spins up its own loop, but the async `db` fixture from `tests/conftest.py` is bound to pytest-asyncio's session loop — using `TestClient` together with the `db` fixture produces "Future attached to a different loop" errors. `ASGITransport` runs the ASGI app on the test's own loop so the asyncpg connection is reused. See `tests/api/v1/agents/test_router.py` for the canonical fixture.
+
+For tests that hit the database, use the existing `db` fixture and override `get_db` like this:
 
 ```python
 from fastapi.testclient import TestClient
