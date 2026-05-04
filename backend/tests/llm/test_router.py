@@ -65,13 +65,13 @@ async def test_router_dispatches_structured_extraction_to_openai():
     assert route.called
 
 
-def test_router_raises_for_unmapped_role():
-    r = LLMRouter(
-        providers=[AnthropicProvider(api_key="x")],
-        role_models={"long_context_reasoning": "anthropic:m"},
-    )
-    with pytest.raises(KeyError):
-        r._resolve(LLMRole.MESSAGE_GENERATION)
+def test_router_rejects_incomplete_role_mapping():
+    # Construction must fail when role_models doesn't cover every LLMRole.
+    with pytest.raises(ValueError, match="missing entries"):
+        LLMRouter(
+            providers=[AnthropicProvider(api_key="x")],
+            role_models={"long_context_reasoning": "anthropic:m"},
+        )
 
 
 def test_router_raises_for_unknown_provider():

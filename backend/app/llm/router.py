@@ -18,6 +18,15 @@ class LLMRouter:
         role_models: dict[str, str],
     ) -> None:
         self._providers = {p.name: p for p in providers}
+        if len(self._providers) != len(providers):
+            raise ValueError("duplicate provider names in providers list")
+
+        missing = {r.value for r in LLMRole} - set(role_models)
+        if missing:
+            raise ValueError(
+                f"role_models missing entries for {sorted(missing)}"
+            )
+
         self._role_models: dict[str, tuple[LLMProvider, str]] = {}
 
         for role, value in role_models.items():
