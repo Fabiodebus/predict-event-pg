@@ -33,5 +33,9 @@ class Settings(BaseSettings):
     unipile_api_key: str
     unipile_base_url: str
 
+    # LangGraph PostgresSaver — separate sync DSN (postgresql://...) from
+    # the async asyncpg URL used by SQLAlchemy. PostgresSaver uses psycopg.
+    langgraph_checkpoint_dsn: str  # postgresql://user:pass@host:5432/dbname
+
 
 settings = Settings()
