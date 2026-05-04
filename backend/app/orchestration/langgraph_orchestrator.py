@@ -59,11 +59,19 @@ class LangGraphOrchestrator(WorkflowOrchestrator):
 
         graph = self._builder().compile(checkpointer=self._checkpointer)
         config = {"configurable": {"thread_id": str(wr.id)}}
-        final_state = await graph.ainvoke(initial_state, config=config)
+        try:
+            final_state = await graph.ainvoke(initial_state, config=config)
+        except Exception as exc:
+            wr.status = WorkflowRunStatus.FAILED
+            wr.error = f"{type(exc).__name__}: {exc}"
+            await repo.update(wr)
+            raise
 
+        final_dict = dict(final_state)
         wr.iteration_count += 1
-        wr.state = dict(final_state)
-        score = float(dict(final_state).get("score", 0.0))
+        wr.state = final_dict
+        wr.current_node = None  # graph ran to END; no pause point
+        score = float(final_dict.get("score", 0.0))
         if policy.should_escalate(iteration_count=wr.iteration_count, score=score):
             wr.escalated = True
             wr.status = WorkflowRunStatus.ESCALATED
