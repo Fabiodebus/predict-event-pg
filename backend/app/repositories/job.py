@@ -11,3 +11,8 @@ class JobRepository(BaseRepository[Job]):
         stmt = select(self.model).where(self.model.celery_task_id == celery_task_id)
         result = await self.db.execute(stmt)
         return result.scalars().first()
+
+    async def get_by_idempotency_key(self, idempotency_key: str) -> Job | None:
+        stmt = select(self.model).where(self.model.idempotency_key == idempotency_key)
+        result = await self.db.execute(stmt)
+        return result.scalars().first()

@@ -79,3 +79,20 @@ async def test_job_delete(db: AsyncSession) -> None:
     await repo.delete(created_id)
     result = await repo.get(created_id)
     assert result is None
+
+
+async def test_get_by_idempotency_key_found(db: AsyncSession) -> None:
+    repo = JobRepository(db)
+    await repo.create(
+        Job(workspace_id=uuid4(), task_type="enrichment", idempotency_key="enrich:account-1")
+    )
+    db.expire_all()
+
+    found = await repo.get_by_idempotency_key("enrich:account-1")
+    assert found is not None
+    assert found.idempotency_key == "enrich:account-1"
+
+
+async def test_get_by_idempotency_key_not_found(db: AsyncSession) -> None:
+    repo = JobRepository(db)
+    assert await repo.get_by_idempotency_key("never-seen") is None
