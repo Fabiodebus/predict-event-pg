@@ -71,6 +71,11 @@ def upgrade() -> None:
     )
     op.alter_column("jobs", "attempt_count", server_default=None)
 
+    # Hand-named FK; diverges from env.py naming convention
+    # (fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s).
+    # If a future --autogenerate emits a rename op for this constraint,
+    # discard it — both staging Aurora DBs (predict, predict_test) hold
+    # the short name committed in this revision.
     op.create_foreign_key(
         "fk_jobs_workflow_run_id",
         "jobs",
