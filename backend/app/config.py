@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     openai_api_key: str
 
+    # LLM role -> "<provider>:<model_id>" mapping. Provider must be one of
+    # the names registered in app.llm.router. No model defaults; raise on
+    # missing role at startup.
+    llm_role_models: dict[str, str] = {
+        "long_context_reasoning": "anthropic:claude-3-7-sonnet-20250219",
+        "structured_extraction": "openai:gpt-4o-mini",
+        "message_generation": "openai:gpt-4o-mini",
+    }
+
     # Third-party integrations
     crustdata_api_key: str
     browser_use_api_key: str
