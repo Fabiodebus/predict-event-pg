@@ -40,7 +40,7 @@ class IdempotentTask(Task):
         dispatch()   -> writes Job(status=pending, idempotency_key=?, celery_task_id=?)
         before_start -> Job.status = in_progress, attempt_count += 1
         on_success   -> Job.status = completed
-        on_failure   -> Job.status = failed, Job.error = repr(exc)
+        on_failure   -> Job.status = failed, Job.error = "<ExcType>: <message>"
 
     The task return value is NOT written to Job.result. Per blueprint,
     results are validated and persisted by the API layer.

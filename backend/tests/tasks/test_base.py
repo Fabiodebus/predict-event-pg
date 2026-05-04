@@ -108,3 +108,40 @@ async def test_failure_records_error_and_increments_attempts(db: AsyncSession) -
     assert "boom" in (job.error or "")
     # max_retries=2 means up to 3 total attempts.
     assert job.attempt_count >= 1
+
+
+async def test_mutate_job_db_persists_cross_process(db: AsyncSession) -> None:
+    """Direct test of the production (cross-process) DB write path.
+
+    The hooks' in-memory cache only catches same-process invocations. In a real
+    Celery worker the cache is empty and `_mutate_job_db` is the path that runs.
+    Clearing `_jobs` here forces that path; the autouse `_open_session`
+    monkeypatch routes its session into the test's savepoint.
+    """
+    workspace_id = uuid4()
+    job = await IdempotentTask.dispatch(
+        echo_task,
+        workspace_id=workspace_id,
+        task_type="echo",
+        args=("hi",),
+        db=db,
+    )
+    echo_task._jobs.clear()  # type: ignore[attr-defined]
+
+    await echo_task._mutate_job_db(  # type: ignore[attr-defined]
+        job.celery_task_id,
+        status=JobStatus.IN_PROGRESS,
+        bump_attempt=True,
+    )
+    await db.refresh(job)
+    assert job.status == JobStatus.IN_PROGRESS
+    assert job.attempt_count == 1
+
+    await echo_task._mutate_job_db(  # type: ignore[attr-defined]
+        job.celery_task_id,
+        status=JobStatus.FAILED,
+        error="boom",
+    )
+    await db.refresh(job)
+    assert job.status == JobStatus.FAILED
+    assert job.error == "boom"
