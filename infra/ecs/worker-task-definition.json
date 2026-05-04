@@ -1,0 +1,48 @@
+{
+  "family": "predict-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/predict-ecs-execution",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/predict-worker-task",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/predict-backend:IMAGE_TAG",
+      "essential": true,
+      "command": [
+        "celery", "-A", "app.celery_app", "worker",
+        "--loglevel=info", "--queues=default", "-c", "4"
+      ],
+      "environment": [
+        { "name": "AWS_REGION", "value": "us-east-1" },
+        { "name": "COGNITO_REGION", "value": "us-east-1" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL",                "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/database_url" },
+        { "name": "CELERY_BROKER_URL",           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/celery_broker_url" },
+        { "name": "CELERY_RESULT_BACKEND",       "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/celery_result_backend" },
+        { "name": "LANGGRAPH_CHECKPOINT_DSN",    "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/langgraph_checkpoint_dsn" },
+        { "name": "COGNITO_USER_POOL_ID",        "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/cognito_user_pool_id" },
+        { "name": "COGNITO_CLIENT_ID",           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/cognito_client_id" },
+        { "name": "AWS_S3_BUCKET",               "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/aws_s3_bucket" },
+        { "name": "ANTHROPIC_API_KEY",           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/anthropic_api_key" },
+        { "name": "OPENAI_API_KEY",              "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/openai_api_key" },
+        { "name": "CRUSTDATA_API_KEY",           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/crustdata_api_key" },
+        { "name": "BROWSER_USE_API_KEY",         "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/browser_use_api_key" },
+        { "name": "UNIPILE_API_KEY",             "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/unipile_api_key" },
+        { "name": "UNIPILE_BASE_URL",            "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/unipile_base_url" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/predict-worker",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "worker",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}

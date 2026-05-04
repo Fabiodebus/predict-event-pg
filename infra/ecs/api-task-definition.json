@@ -1,0 +1,54 @@
+{
+  "family": "predict-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/predict-ecs-execution",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/predict-api-task",
+  "containerDefinitions": [
+    {
+      "name": "api",
+      "image": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/predict-backend:IMAGE_TAG",
+      "essential": true,
+      "command": ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"],
+      "portMappings": [{ "containerPort": 8000, "protocol": "tcp" }],
+      "environment": [
+        { "name": "AWS_REGION", "value": "us-east-1" },
+        { "name": "COGNITO_REGION", "value": "us-east-1" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL",                "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/database_url" },
+        { "name": "CELERY_BROKER_URL",           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/celery_broker_url" },
+        { "name": "CELERY_RESULT_BACKEND",       "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/celery_result_backend" },
+        { "name": "LANGGRAPH_CHECKPOINT_DSN",    "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/langgraph_checkpoint_dsn" },
+        { "name": "COGNITO_USER_POOL_ID",        "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/cognito_user_pool_id" },
+        { "name": "COGNITO_CLIENT_ID",           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/cognito_client_id" },
+        { "name": "AWS_S3_BUCKET",               "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/aws_s3_bucket" },
+        { "name": "ANTHROPIC_API_KEY",           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/anthropic_api_key" },
+        { "name": "OPENAI_API_KEY",              "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/openai_api_key" },
+        { "name": "CRUSTDATA_API_KEY",           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/crustdata_api_key" },
+        { "name": "BROWSER_USE_API_KEY",         "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/browser_use_api_key" },
+        { "name": "UNIPILE_API_KEY",             "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/unipile_api_key" },
+        { "name": "UNIPILE_BASE_URL",            "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/unipile_base_url" },
+        { "name": "ALLOWED_ORIGINS",             "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:predict/allowed_origins" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/predict-api",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "api",
+          "awslogs-create-group": "true"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      }
+    }
+  ]
+}
