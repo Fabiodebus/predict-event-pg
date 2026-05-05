@@ -1,5 +1,11 @@
 from app.models.audit import AuditLog
 from app.models.best_customer import BestCustomer, EnrichmentStatus
+from app.models.gtm_thesis import (
+    GTMThesis,
+    GTMThesisSection,
+    GTMThesisVersion,
+    ThesisStatus,
+)
 from app.models.job import Job, JobStatus
 from app.models.persona import Persona
 from app.models.sales_material import (
@@ -17,12 +23,16 @@ __all__ = [
     "ContentType",
     "EnrichmentStatus",
     "ExtractionStatus",
+    "GTMThesis",
+    "GTMThesisSection",
+    "GTMThesisVersion",
     "Job",
     "JobStatus",
     "Persona",
     "ProximityPreference",
     "SalesMarketingMaterial",
     "TargetMarket",
+    "ThesisStatus",
     "WorkflowRun",
     "WorkflowRunStatus",
     "Workspace",
