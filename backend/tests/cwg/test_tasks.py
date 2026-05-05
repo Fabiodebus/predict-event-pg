@@ -166,3 +166,124 @@ async def test_enrich_falls_back_to_company_name(db: AsyncSession):
 async def test_enrich_skips_when_bc_not_found(db: AsyncSession):
     result = await _run_enrich_best_customer(uuid4())
     assert result["status"] == "skipped"
+
+
+# ---------------------------------------------------------------------------
+# Material extraction
+# ---------------------------------------------------------------------------
+
+
+from app.cwg.tasks import (  # noqa: E402
+    ExtractedContent,
+    _run_extract_material,
+)
+from app.models.sales_material import (  # noqa: E402
+    ContentType,
+    ExtractionStatus,
+    SalesMarketingMaterial,
+)
+
+
+def _stub_extract_via_llm(monkeypatch, payload: ExtractedContent):
+    """Replace the LLM call so the test asserts our wiring, not vendor behaviour."""
+
+    async def _fake(text: str) -> ExtractedContent:
+        return payload
+
+    import app.cwg.tasks as cwg_tasks
+
+    monkeypatch.setattr(cwg_tasks, "_extract_via_llm", _fake)
+
+
+async def test_extract_text_material_persists_extracted_content(
+    db: AsyncSession, monkeypatch
+):
+    ws = await _make_workspace(db)
+    m = SalesMarketingMaterial(
+        workspace_id=ws.id,
+        content_type=ContentType.TEXT,
+        raw_text="We help mid-market SaaS teams ship faster. 42% conversion lift at Acme.",
+    )
+    db.add(m)
+    await db.flush()
+
+    payload = ExtractedContent(
+        solution_description="Outreach automation for mid-market SaaS",
+        proof_points=["42% conversion lift at Acme"],
+        use_cases=["B2B sales outbound"],
+        customer_references=["Acme"],
+        communication_style_indicators=["direct", "metric-led"],
+    )
+    _stub_extract_via_llm(monkeypatch, payload)
+
+    result = await _run_extract_material(m.id)
+    await db.refresh(m)
+
+    assert result["status"] == "ok"
+    assert m.extraction_status == ExtractionStatus.EXTRACTED
+    assert m.extracted_content == payload.model_dump()
+
+
+async def test_extract_marks_failed_on_empty_content(db: AsyncSession):
+    ws = await _make_workspace(db)
+    m = SalesMarketingMaterial(
+        workspace_id=ws.id, content_type=ContentType.TEXT, raw_text=""
+    )
+    db.add(m)
+    await db.flush()
+
+    result = await _run_extract_material(m.id)
+    await db.refresh(m)
+    assert result["status"] == "failed"
+    assert result["reason"] == "empty_content"
+    assert m.extraction_status == ExtractionStatus.FAILED
+
+
+async def test_extract_marks_failed_on_llm_invalid_output(
+    db: AsyncSession, monkeypatch
+):
+    ws = await _make_workspace(db)
+    m = SalesMarketingMaterial(
+        workspace_id=ws.id, content_type=ContentType.TEXT, raw_text="some content"
+    )
+    db.add(m)
+    await db.flush()
+
+    async def _bad(_: str) -> ExtractedContent:
+        # Mimic a Pydantic validation failure surfacing from the LLM call.
+        from pydantic import ValidationError
+        raise ValidationError.from_exception_data(
+            "ExtractedContent", line_errors=[]
+        )
+
+    import app.cwg.tasks as cwg_tasks
+
+    monkeypatch.setattr(cwg_tasks, "_extract_via_llm", _bad)
+
+    result = await _run_extract_material(m.id)
+    await db.refresh(m)
+    assert result["status"] == "failed"
+    assert result["reason"] == "llm_output_invalid"
+    assert m.extraction_status == ExtractionStatus.FAILED
+
+
+async def test_extract_skips_when_material_not_found():
+    result = await _run_extract_material(uuid4())
+    assert result["status"] == "skipped"
+
+
+async def test_extract_marks_failed_on_non_text_without_s3_key(db: AsyncSession):
+    ws = await _make_workspace(db)
+    m = SalesMarketingMaterial(
+        workspace_id=ws.id, content_type=ContentType.PDF, s3_key=None
+    )
+    db.add(m)
+    await db.flush()
+
+    result = await _run_extract_material(m.id)
+    await db.refresh(m)
+    assert result["status"] == "failed"
+    assert "load_error" in result["reason"]
+    assert m.extraction_status == ExtractionStatus.FAILED
+
+
