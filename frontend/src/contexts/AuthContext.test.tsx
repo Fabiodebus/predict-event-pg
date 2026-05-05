@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -114,12 +114,12 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("email")).toHaveTextContent("alice@example.com");
     });
 
-    await act(async () => {
-      await userEvent.click(screen.getByRole("button", { name: "sign out" }));
-    });
+    await userEvent.click(screen.getByRole("button", { name: "sign out" }));
 
     expect(mockSignOut).toHaveBeenCalledOnce();
-    expect(screen.getByTestId("email")).toHaveTextContent("anonymous");
+    await waitFor(() => {
+      expect(screen.getByTestId("email")).toHaveTextContent("anonymous");
+    });
   });
 });
 
