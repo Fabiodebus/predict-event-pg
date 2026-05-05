@@ -1,7 +1,8 @@
 import pytest
 import boto3
 from moto import mock_aws
-from unittest.mock import patch
+
+from app.s3.client import _client
 
 
 @pytest.fixture
@@ -9,6 +10,10 @@ def mock_s3(monkeypatch):
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test")
     monkeypatch.setenv("AWS_DEFAULT_REGION", "eu-central-1")
+    # The lru_cache on _client() means a client created in a previous
+    # mock_aws() block would still be returned here, with its transport
+    # bound to the now-exited patch. Clear so this test's mock takes hold.
+    _client.cache_clear()
     with mock_aws():
         s3 = boto3.client("s3", region_name="eu-central-1")
         s3.create_bucket(
@@ -16,6 +21,7 @@ def mock_s3(monkeypatch):
             CreateBucketConfiguration={"LocationConstraint": "eu-central-1"},
         )
         yield s3
+    _client.cache_clear()
 
 
 def test_get_presigned_put_url_returns_string(mock_s3):

@@ -1,9 +1,16 @@
+from functools import lru_cache
+
 import boto3
 
 from app.config import settings
 
 
+@lru_cache(maxsize=1)
 def _client():
+    """Cached module-level boto3 S3 client. Tests must call _client.cache_clear()
+    when entering a fresh moto mock_aws() context, since the cached client's
+    transport layer is bound to the patch active at construction time.
+    """
     return boto3.client("s3", region_name=settings.aws_region)
 
 
