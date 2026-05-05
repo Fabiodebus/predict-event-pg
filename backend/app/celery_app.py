@@ -6,7 +6,6 @@ celery_app = Celery(
     "predict",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.tasks.base"],
 )
 
 celery_app.conf.update(
@@ -18,5 +17,10 @@ celery_app.conf.update(
     task_default_queue="default",
     timezone="UTC",
     enable_utc=True,
-    imports=("app.tasks",),
 )
+
+# Feature WOs put their Celery tasks at `app/<feature>/tasks.py`.
+# autodiscover_tasks(packages=[...]) loads the task module from each listed
+# package at worker boot. Add new feature packages here as they land.
+AUTODISCOVER_PACKAGES = ["app.cwg"]
+celery_app.autodiscover_tasks(packages=AUTODISCOVER_PACKAGES)

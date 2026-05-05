@@ -27,8 +27,11 @@ def test_celery_app_acks_late_for_idempotency():
     assert celery_app.conf.task_reject_on_worker_lost is True
 
 
-def test_celery_app_autodiscovers_tasks_module():
-    # Tasks live under app.tasks.*; importing celery_app must register them.
-    assert "app.tasks" in celery_app.conf.imports or any(
-        t.startswith("app.tasks.") for t in celery_app.tasks.keys()
-    )
+def test_celery_app_autodiscovers_per_feature_tasks_packages():
+    # Feature WOs (CWG, ES, EUB, ...) place tasks at app/<feature>/tasks.py.
+    # autodiscover_tasks loads them at worker boot. Verify the configured
+    # package list includes each known feature so adding a new feature is a
+    # one-line append rather than a regex check that quietly breaks.
+    from app.celery_app import AUTODISCOVER_PACKAGES
+
+    assert "app.cwg" in AUTODISCOVER_PACKAGES
