@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Awaitable, Callable
 from functools import lru_cache
 from typing import Literal
 from uuid import UUID
@@ -15,11 +16,14 @@ logger = logging.getLogger(__name__)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token", auto_error=True)
 
 
+Role = Literal["customer", "gtm_engineer"]
+
+
 class UserContext(BaseModel):
     user_id: UUID
     workspace_id: UUID
     email: EmailStr
-    role: Literal["customer", "gtm_engineer"]
+    role: Role
 
 
 @lru_cache(maxsize=1)
@@ -59,3 +63,20 @@ async def get_current_user(
             detail="Invalid token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
+
+
+def require_role(*allowed_roles: Role) -> Callable[..., Awaitable[UserContext]]:
+    """Build a FastAPI dependency that 403s if the authenticated user's role is not allowed."""
+
+    async def _check(user: UserContext = Depends(get_current_user)) -> UserContext:
+        if user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{user.role}' not permitted for this resource",
+            )
+        return user
+
+    return _check
+
+
+require_gtm_engineer = require_role("gtm_engineer")

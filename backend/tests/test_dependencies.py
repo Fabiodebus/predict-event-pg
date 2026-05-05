@@ -9,7 +9,13 @@ from fastapi.testclient import TestClient
 from jose import jwt
 from jose.utils import long_to_base64
 
-from app.dependencies import UserContext, get_current_user, get_token_validator
+from app.dependencies import (
+    UserContext,
+    get_current_user,
+    get_token_validator,
+    require_gtm_engineer,
+    require_role,
+)
 from app.middleware.cognito import CognitoTokenValidator
 
 
@@ -126,6 +132,65 @@ def test_token_with_invalid_role_returns_401(rsa_keypair: tuple[str, dict]) -> N
         headers={"Authorization": f"Bearer {_token(private_pem, claims)}"},
     )
     assert response.status_code == 401
+
+
+def _make_role_guarded_app(
+    actor_role: str, guard: object, route: str = "/guarded"
+) -> FastAPI:
+    """Build an app that overrides get_current_user with a fixed role and exposes a guarded route."""
+    app = FastAPI()
+    fake_user = UserContext(
+        user_id=uuid4(),
+        workspace_id=uuid4(),
+        email="user@example.com",
+        role=actor_role,  # type: ignore[arg-type]
+    )
+
+    async def _override_user() -> UserContext:
+        return fake_user
+
+    app.dependency_overrides[get_current_user] = _override_user
+
+    @app.get(route)
+    async def _route(user: UserContext = Depends(guard)) -> dict:
+        return {"role": user.role}
+
+    return app
+
+
+def test_require_role_allows_matching_role() -> None:
+    guard = require_role("gtm_engineer")
+    client = TestClient(_make_role_guarded_app("gtm_engineer", guard))
+    response = client.get("/guarded")
+    assert response.status_code == 200
+    assert response.json() == {"role": "gtm_engineer"}
+
+
+def test_require_role_rejects_non_matching_role() -> None:
+    guard = require_role("gtm_engineer")
+    client = TestClient(_make_role_guarded_app("customer", guard))
+    response = client.get("/guarded")
+    assert response.status_code == 403
+    assert "customer" in response.json()["detail"]
+
+
+def test_require_role_accepts_any_listed_role() -> None:
+    guard = require_role("customer", "gtm_engineer")
+    client = TestClient(_make_role_guarded_app("customer", guard))
+    response = client.get("/guarded")
+    assert response.status_code == 200
+
+
+def test_require_gtm_engineer_blocks_customer() -> None:
+    client = TestClient(_make_role_guarded_app("customer", require_gtm_engineer))
+    response = client.get("/guarded")
+    assert response.status_code == 403
+
+
+def test_require_gtm_engineer_allows_gtm_engineer() -> None:
+    client = TestClient(_make_role_guarded_app("gtm_engineer", require_gtm_engineer))
+    response = client.get("/guarded")
+    assert response.status_code == 200
 
 
 def test_token_missing_workspace_id_returns_401(rsa_keypair: tuple[str, dict]) -> None:
