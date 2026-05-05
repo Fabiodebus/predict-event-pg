@@ -1,7 +1,22 @@
+import { Authenticator } from "@aws-amplify/ui-react";
+import "@aws-amplify/ui-react/styles.css";
+import { RouterProvider } from "react-router-dom";
+
+import { AuthProvider } from "@/contexts/AuthContext";
+import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
+import { configureAmplify } from "@/lib/amplify";
+import { router } from "@/router";
+
+configureAmplify();
+
 export default function App() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
-      <h1 className="text-2xl font-semibold">PREDICT Event</h1>
-    </main>
+    <Authenticator>
+      <AuthProvider>
+        <WorkspaceProvider>
+          <RouterProvider router={router} />
+        </WorkspaceProvider>
+      </AuthProvider>
+    </Authenticator>
   );
 }

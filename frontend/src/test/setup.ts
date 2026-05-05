@@ -1,5 +1,9 @@
 import "@testing-library/jest-dom/vitest";
 
-// React 18 act() warning suppression in Vitest+jsdom — must be set before
-// any component is rendered.
+declare global {
+  // React testing utility flag — enables proper act() warning behavior.
+  // eslint-disable-next-line no-var
+  var IS_REACT_ACT_ENVIRONMENT: boolean;
+}
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
